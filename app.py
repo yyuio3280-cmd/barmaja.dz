@@ -1,13 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 import datetime
 import os
-from vercel_kv import KV
+# استدعاء المكتبة الرسمية الصحيحة من Vercel
+import vercel_storage
 
 app = Flask(__name__)
 
 # الاتصال التلقائي بقاعدة بيانات Vercel KV السحابية
 try:
-    kv = KV()
+    kv = vercel_storage.KV()
 except Exception:
     kv = None
 
@@ -23,16 +24,15 @@ def register():
 
     # التحقق من أن المستخدم ملأ جميع الحقول
     if not first_name or not last_name or not instagram:
-        return jsonify({'status': 'error', 'message': 'الرجاء ملء جميع الحقول المطلوب!'})
+        return jsonify({'status': 'error', 'message': 'الرجاء ملء جميع الحقول المطلوبة!'})
 
     # إزالة رمز @ إذا قام الطالب بكتابته تلقائيًا
     if instagram.startswith('@'):
         instagram = instagram[1:]
 
     try:
-        # إذا كنا نقوم بالتجربة محليًا ولم نربط Vercel KV بعد، نستخدم ملف مؤقت تجريبي
+        # إذا كنا نقوم بالتجربة محليًا ولم نربط Vercel KV بعد، نستخدم نظام ملفات مؤقت للتجربة
         if kv is None:
-            # طريقة تجريبية فقط للـ Localhost
             DATA_FILE = 'students_local_dev.txt'
             current_id = 1
             if os.path.exists(DATA_FILE):
@@ -48,11 +48,12 @@ def register():
                 
             return jsonify({'status': 'success', 'message': 'تم الحفظ محليًا (بيئة تجريبية)!', 'user_id': formatted_id})
 
-        # --- البيئة الرسمية الحية على Vercel ---
+        # --- البيئة الرسمية الحية على Vercel الحافظة للبيانات ---
+        
         # 1. زيادة العداد التصاعدي بمقدار 1 في السحاب (يبدأ من 1 لو كان فارغًا)
         current_id = kv.incr('student_counter')
         
-        # 2. تنسيق الرقم التعريفي ليصبح مكونًا من 10 خانات (مثال: 0000000001)
+        # 2. تنسيق الرقم التعريفي ليصبح مكونًا من 10 خانات وتصاعدي (مثال: 0000000001)
         formatted_id = f"{current_id:010d}"
         
         # 3. تسجيل توقيت العملية الحالي
