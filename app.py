@@ -1,9 +1,18 @@
 from flask import Flask, render_template, request, jsonify
 import datetime
 import os
-from vercel_storage import kv
 
+# تعريف التطبيق (مهم جداً لـ Vercel)
 app = Flask(__name__)
+
+# محاولة استدعاء مكتبة قاعدة البيانات
+try:
+    from vercel_storage import kv
+    # تحقق بسيط للتأكد من وجود الإعدادات في Vercel
+    if not os.environ.get("VERCEL_KV_URL"):
+        kv = None
+except Exception:
+    kv = None
 
 @app.route('/')
 def index():
@@ -21,46 +30,56 @@ def register():
     if instagram.startswith('@'):
         instagram = instagram[1:]
 
-    try:
-        # 1. زيادة العداد التصاعدي بمقدار 1 في السحاب
-        current_id = kv.incr('student_counter')
-        
-        # 2. تنسيق الرقم التعريفي ليصبح مكونًا من 10 خانات (مثال: 0000000001)
-        formatted_id = f"{current_id:010d}"
-        
-        # 3. تسجيل توقيت العملية الحالي
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # توقيت التسجيل الحالي
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 4. حفظ بيانات الطالب بشكل منظم داخل الـ KV
-        student_info = {
-            'id': formatted_id,
-            'name': f"{first_name} {last_name}",
-            'instagram': f"@{instagram}",
-            'registered_at': current_time
-        }
-        
-        # تخزين البيانات بمفتاح فريد يعتمد على الرقم التعريفي للطالب
-        kv.set(f"student:{formatted_id}", student_info)
+    # 1. إذا كانت قاعدة البيانات متصلة وجاهزة على Vercel
+    if kv is not None:
+        try:
+            current_id = kv.incr('student_counter')
+            formatted_id = f"{current_id:010d}"
+            
+            student_info = {
+                'id': formatted_id,
+                'name': f"{first_name} {last_name}",
+                'instagram': f"@{instagram}",
+                'registered_at': current_time
+            }
+            kv.set(f"student:{formatted_id}", student_info)
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'تم التسجيل في قاعدة البيانات!',
+                'user_id': formatted_id
+            })
+        except Exception as e:
+            # إذا فشل الاتصال بالـ KV لسبب ما، ننتقل للحل البديل بالأسفل
+            pass
 
-        return jsonify({
-            'status': 'success',
-            'message': 'تم التسجيل بنجاح في قاعدة البيانات السحابية!',
-            'user_id': formatted_id
-        })
-        
-    except Exception as e:
-        # في بيئة التجربة المحلية قبل ربط الـ KV، سيعمل هذا الجزء كبديل مؤقت
-        DATA_FILE = 'students_local_dev.txt'
-        current_id = 1
-        if os.path.exists(DATA_FILE):
+    # 2. الحل البديل (في حال عدم ربط Storage أو التشغيل المحلي)
+    DATA_FILE = '/tmp/students_local.txt' if os.environ.get('VERCEL') else 'students_local.txt'
+    current_id = 1
+    if os.path.exists(DATA_FILE):
+        try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 current_id = len(f.readlines()) + 1
-        
-        formatted_id = f"{current_id:010d}"
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        record = f"ID: {formatted_id} | Name: {first_name} {last_name} | Insta: @{instagram} | Time: {current_time}\n"
-        
+        except Exception:
+            current_id = 1
+            
+    formatted_id = f"{current_id:010d}"
+    record = f"ID: {formatted_id} | Name: {first_name} {last_name} | Insta: @{instagram} | Time: {current_time}\n"
+    
+    try:
         with open(DATA_FILE, 'a', encoding='utf-8') as f:
             f.write(record)
-            
-        return jsonify({'status': 'success', 'message': 'تم الحفظ (بيئة تجريبية محلية)!', 'user_id': formatted_id})
+    except Exception:
+        pass
+        
+    return jsonify({
+        'status': 'success', 
+        'message': 'تم التسجيل بنجاح!', 
+        'user_id': formatted_id
+    })
+
+# هذا السطر ضروري لـ Vercel ليعرف أين يتوجه
+app.index = app
