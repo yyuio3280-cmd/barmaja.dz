@@ -1,16 +1,9 @@
 from flask import Flask, render_template, request, jsonify
 import datetime
 import os
-# استدعاء المكتبة الرسمية الصحيحة من Vercel
-import vercel_storage
+from vercel_storage import kv
 
 app = Flask(__name__)
-
-# الاتصال التلقائي بقاعدة بيانات Vercel KV السحابية
-try:
-    kv = vercel_storage.KV()
-except Exception:
-    kv = None
 
 @app.route('/')
 def index():
@@ -22,38 +15,17 @@ def register():
     last_name = request.form.get('last_name', '').strip()
     instagram = request.form.get('instagram', '').strip()
 
-    # التحقق من أن المستخدم ملأ جميع الحقول
     if not first_name or not last_name or not instagram:
         return jsonify({'status': 'error', 'message': 'الرجاء ملء جميع الحقول المطلوبة!'})
 
-    # إزالة رمز @ إذا قام الطالب بكتابته تلقائيًا
     if instagram.startswith('@'):
         instagram = instagram[1:]
 
     try:
-        # إذا كنا نقوم بالتجربة محليًا ولم نربط Vercel KV بعد، نستخدم نظام ملفات مؤقت للتجربة
-        if kv is None:
-            DATA_FILE = 'students_local_dev.txt'
-            current_id = 1
-            if os.path.exists(DATA_FILE):
-                with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                    current_id = len(f.readlines()) + 1
-            
-            formatted_id = f"{current_id:010d}"
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            record = f"ID: {formatted_id} | Name: {first_name} {last_name} | Insta: @{instagram} | Time: {current_time}\n"
-            
-            with open(DATA_FILE, 'a', encoding='utf-8') as f:
-                f.write(record)
-                
-            return jsonify({'status': 'success', 'message': 'تم الحفظ محليًا (بيئة تجريبية)!', 'user_id': formatted_id})
-
-        # --- البيئة الرسمية الحية على Vercel الحافظة للبيانات ---
-        
-        # 1. زيادة العداد التصاعدي بمقدار 1 في السحاب (يبدأ من 1 لو كان فارغًا)
+        # 1. زيادة العداد التصاعدي بمقدار 1 في السحاب
         current_id = kv.incr('student_counter')
         
-        # 2. تنسيق الرقم التعريفي ليصبح مكونًا من 10 خانات وتصاعدي (مثال: 0000000001)
+        # 2. تنسيق الرقم التعريفي ليصبح مكونًا من 10 خانات (مثال: 0000000001)
         formatted_id = f"{current_id:010d}"
         
         # 3. تسجيل توقيت العملية الحالي
@@ -77,4 +49,18 @@ def register():
         })
         
     except Exception as e:
-        return jsonify({'status': 'error', 'message': f'خطأ في السيرفر أو قاعدة البيانات: {str(e)}'})
+        # في بيئة التجربة المحلية قبل ربط الـ KV، سيعمل هذا الجزء كبديل مؤقت
+        DATA_FILE = 'students_local_dev.txt'
+        current_id = 1
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, 'r', encoding='utf-8') as f:
+                current_id = len(f.readlines()) + 1
+        
+        formatted_id = f"{current_id:010d}"
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        record = f"ID: {formatted_id} | Name: {first_name} {last_name} | Insta: @{instagram} | Time: {current_time}\n"
+        
+        with open(DATA_FILE, 'a', encoding='utf-8') as f:
+            f.write(record)
+            
+        return jsonify({'status': 'success', 'message': 'تم الحفظ (بيئة تجريبية محلية)!', 'user_id': formatted_id})
