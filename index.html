@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BARMAJA.DZ | منصة تسجيل الطلاب</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #080c14;
+            color: #f3f4f6;
+            font-family: 'Cairo', sans-serif;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen justify-between items-center p-4">
+
+    <header class="text-center mt-8 animate-fade-in">
+        <h1 class="text-5xl font-black text-blue-500 tracking-wider border-b-4 border-blue-600 pb-3 inline-block">BARMAJA.DZ</h1>
+        <p class="text-gray-400 mt-4 text-sm font-medium">نظام تسجيل وتوليد الأرقام التعريفية للطلاب بشكل آلي</p>
+    </header>
+
+    <main class="w-full max-w-md bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-2xl shadow-blue-950/30 my-auto backdrop-blur-md">
+        <h2 class="text-xl font-bold text-center mb-6 text-white border-b border-slate-850 pb-3">إنشاء ملف تعريف طالب جديد</h2>
+        
+        <form id="studentForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">الاسم الشخصي</label>
+                <input type="text" name="first_name" required placeholder="أدخل اسمك" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">اللقب (اسم العائلة)</label>
+                <input type="text" name="last_name" required placeholder="أدخل لقبك" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">اسم المستخدم على انستغرام</label>
+                <div class="relative flex items-center">
+                    <span class="absolute left-3 text-gray-500 font-mono font-bold">@</span>
+                    <input type="text" name="instagram" required placeholder="yrzz._16" class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-8 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors text-left font-mono placeholder:text-gray-600" style="direction: ltr;">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200 mt-4 cursor-pointer shadow-lg shadow-blue-600/20 active:scale-[0.99]">
+                تأكيد التسجيل وتوليد الرقم
+            </button>
+        </form>
+
+        <div id="resultBox" class="hidden mt-6 p-5 bg-slate-950 border-2 border-blue-500/30 rounded-xl text-center animate-bounce-short">
+            <p class="text-green-400 font-bold text-lg mb-2">🎉 تم حفظ بياناتك بنجاح</p>
+            <p class="text-xs text-gray-400">الرقم التعريفي المخصص لك هو:</p>
+            <div id="idValue" class="text-3xl font-mono font-bold text-blue-400 tracking-widest my-3 bg-slate-900 py-3 rounded-lg border border-slate-800 shadow-inner">0000000000</div>
+            <p class="text-xs text-amber-400/80">⚠️ يرجى تصوير الشاشة أو حفظ هذا الرقم للضرورة.</p>
+        </div>
+    </main>
+
+    <footer class="text-center text-sm text-gray-500 mb-6 space-y-1">
+        <p class="font-medium">المسؤول التقني للمنصة: <span class="text-blue-500 font-bold">يوسف</span></p>
+        <p class="font-mono text-xs">Insta Account: <a href="https://instagram.com/yrzz._16" target="_blank" class="text-gray-400 hover:text-blue-500 transition-colors underline decoration-blue-600/50">yrzz._16</a></p>
+    </footer>
+
+    <script>
+        document.getElementById('studentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const resultBox = document.getElementById('resultBox');
+            const idValue = document.getElementById('idValue');
+            
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    idValue.innerText = data.user_id;
+                    resultBox.classList.remove('hidden');
+                    e.target.reset(); // تصفير الحقول بعد الإرسال الناجح
+                } else {
+                    alert('خطأ: ' + data.message);
+                }
+            } catch (error) {
+                alert('عذراً، تعذر الاتصال بالسيرفر. تحقق من جودة الإنترنت لديك.');
+            }
+        });
+    </script>
+</body>
+</html>
